@@ -14,5 +14,10 @@ to create executable bin/application.sh
 Main method is located in 
 ScalaMacros/core/src/main/scala/application/Main.scala 
 
+Samples can be found in Main.scala
+
 Macro is located in 
 ScalaMacros/macros/src/main/scala/FindFreeVars.scala 
+
+
+Link to discussion: https://groups.google.com/d/msg/scala-user/VSAFechtnwk/NDNeNzf9Fi4J
