@@ -12,7 +12,7 @@ sbt/sbt mkapp
 to create executable bin/application.sh
 
 Main method is located in 
-ScalaMacros / core / src / main / scala / application / Main.scala 
+ScalaMacros/core/src/main/scala/application/Main.scala 
 
 Macro is located in 
-ScalaMacros / macros / src / main / scala / FindFreeVars.scala 
+ScalaMacros/macros/src/main/scala/FindFreeVars.scala 
