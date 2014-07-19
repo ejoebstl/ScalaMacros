@@ -29,6 +29,19 @@ object Main {
     println("Snippet #5")
     snip5()
 
+    /**
+     * Output given by test run:
+     * 
+     * Snippet #1
+     * List((x,2))
+     * Snippet #4
+     * Test
+     * List((b,Test), (x,2))
+     * Snippet #5
+     * inner List((z,7), (x,2))
+     * outer List((x,2))
+     */
+
   }
 
   def snip1() = {
