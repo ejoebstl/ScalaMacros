@@ -30,7 +30,7 @@ object FindFreeVars {
     import c.universe._
 
     val closedVars = createFreeVariableList(c)(func)
-    c.Expr[List[(String, Any)]](q"$closedVars")
+    c.Expr[List[(String, Any)]](q"invokeAndReturn($func, $closedVars)")
   }
 
   /**
@@ -170,7 +170,7 @@ object FindFreeVars {
 
     //New return all Idents from our function which are also defined as
     //Vals in the outer scope. This is necassary to filter out methods,
-    //which can be referenced via Ident, too. 
+    //which can be referenced via Ident, too.
     distincFreeTerms.filter(x => {
         !valDefExtractor.defs.find(y => (y._1 == x._2)).isEmpty
     })

@@ -26,6 +26,8 @@ object Main {
     snip1()
     println("Snippet #4")
     snip4()
+    println("Snippet #5")
+    snip5()
 
   }
 
@@ -51,18 +53,27 @@ object Main {
     )
   }
 
-    def snip4() = {
+  def snip5() = {
     val x = 2
-    val b = "Test"
-    println(
-      findFreeVariables(() => {
-        val y = 3;
-        x + y
-        println(b)
-      })
-    )
+    println("outer " + findFreeVariables(() => {
+      val z = 7
+      println("inner " +
+        findFreeVariables(() => {
+            val y = 3;
+            x + y
+            x + z
+        })
+      )
+      x + z
+    }))
   }
 
   import scala.language.experimental.macros
   def findFreeVariables[T](func: () => T):List[(String, Any)] = macro FindFreeVars.findMacro[T]
+
+  def invokeAndReturn[T](func: () => T, vals: List[(String, Any)]): List[(String, Any)] = {
+    func()
+    vals
+  }
+
 }
