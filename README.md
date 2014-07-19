@@ -5,8 +5,8 @@ Repository for Scala macro experiments
 
 Use: 
 
-sbt compile 
+sbt/sbt compile 
 to compile
 
-mkapp
+sbt/sbt mkapp
 to create executable bin/application.sh
