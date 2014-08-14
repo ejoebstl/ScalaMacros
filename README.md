@@ -1,7 +1,7 @@
 ScalaMacros
 ===========
 
-Repository for Scala macro experiments
+This macro finds all free variables which are bound from an outside scopein a given function parameter.
 
 Use: 
 

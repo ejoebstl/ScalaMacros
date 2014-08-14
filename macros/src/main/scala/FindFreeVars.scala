@@ -25,7 +25,7 @@ object FindFreeVars {
   /**
    * Our find macro - just calls helper functions.
    */
-  def findMacro[T]
+  def findMacro
       (c: Context)(func: c.Tree): c.Expr[List[(String, Any)]] = {
     import c.universe._
 
@@ -34,13 +34,28 @@ object FindFreeVars {
   }
 
   /**
+   * Our pass macro - just calls helper functions with the param
+   */
+  def execMacro[T, V]
+      (c: Context)(param: c.Tree)(func: c.Tree): c.Expr[V] = {
+    import c.universe._
+
+    val closedVars = createFreeVariableList(c)(func)
+    println("Exec macro vars:")
+    closedVars.foreach(println(_))
+    c.Expr[V](q"execAndReturn($func, $param, $closedVars)")
+  }
+
+ /**
    * Generates a list using quasiquotes from free variables from
    * within a tree
    */
   private def createFreeVariableList(c: Context)(func: c.Tree) = {
     import c.universe._
 
-    findFreeVariabels(c)(func).map(x => {
+    val freeVars = findFreeVariabels(c)(func)
+
+    freeVars.map(x => {
       val name = Literal(Constant(x._2))
       val value = x._1
       q"($name, $value)"
@@ -57,14 +72,14 @@ object FindFreeVars {
     import c.universe._
 
     //Symbol of our function.
-    def targetSymbol = func.symbol
+    def targetSymbol = c.macroApplication.symbol
 
     /**
      * A traverser which extracts all ValDef nodes from the AST,
      * which are ancestors of the node which hast the symbol targetSymbol.
      */
     class ParentValDefExtractor(targetSymbol: c.Symbol) extends Traverser {
-      var defs = List[(String, ValDef)]()
+      var defs = List[(String, TreeApi)]()
       var found = false
 
       //Traverse each child tree, remember wheter we already found
@@ -104,20 +119,29 @@ object FindFreeVars {
 
         if(targetSymbol == tree.symbol) {
           found = true
-        } else {
-          tree match {
-            case expr @ ValDef(_, name, _, subtree) =>
-              defs = (name.toString(), expr) :: defs
-              super.traverse(subtree)
-            case Block(trees, tree) => traverseChildTrees(tree :: trees, true)
-            case Function(params, subtree) => {
-                //Special case: If our target is in the subtree
-                //of a function call, we also have to include the
-                //params of our function in the case.
-                traverseChildTrees(params, traverseChildTree(subtree, false))
-            }
-            case _ => super.traverse(tree)
+        }
+
+        tree match {
+          case expr @ ValDef(_, name, _, subtree) =>
+            //We fund a val def.
+            defs = (name.toString(), expr) :: defs
+            super.traverse(subtree)
+          case expr @ Bind(name, _) =>
+            //We found a bind from a case/match. This is also important to
+            //remember.
+            defs = (name.toString(), expr) :: defs
+          case Block(trees, tree) => traverseChildTrees(tree :: trees, false)
+          case Function(params, subtree) => {
+            //Special case: If our target is in the subtree
+            //of a function call, we also have to include the
+            //params of our function in the case.
+            traverseChildTrees(params, traverseChildTree(subtree, false))
           }
+          case CaseDef(valdef, _, matchexpr) => {
+            //Special case: Pattern matching. Handle it similar as function.
+            traverseChildTree(valdef, traverseChildTree(matchexpr, false))
+          }
+          case _ => super.traverse(tree)
         }
       }
     }
@@ -140,39 +164,27 @@ object FindFreeVars {
     var termExtractor = new IdentTermExtractor()
     termExtractor.traverse(func)
 
-    //Check if term is really free
-    var freeTerms = termExtractor.idents.filter((x) => {
+    //Only keep each symbol once, also filter out packes and so on.
+    val filteredTerms = termExtractor.idents.filter(x => {
+                              !x._1.symbol.isPackage &&
+                              !x._1.symbol.isMethod &&
+                              !x._1.symbol.isModule &&
+                              !x._1.symbol.isClass &&
+                              !x._1.symbol.isType &&
+                              x._2 != "_" //Exclude blank.
+                            })
+
+    //Check if all instances of term are really free
+    var distinctFreeTerms = filteredTerms.filter((x) => {
       //For each ident, look for a parent ValDef in our own function.
       val defExtractor = new ParentValDefExtractor(x._1.symbol)
       defExtractor.traverse(func)
 
       //If we define this val ourself, drop it.
-      defExtractor.defs.find(y => x._2 == y._1).isEmpty
-    })
+      val defs = defExtractor.defs
+      defs.find(y => x._2 == y._1).isEmpty
+    }).groupBy(x => x._2).map(x => x._2.head).toList
 
-    //Only keep each symbol once.
-    val distincFreeTerms = freeTerms.groupBy(x => x._2)
-                            .map(x => x._2.head).toList
-
-    //Now, find all ValDefs which are ancestors of our function in
-    //the AST.
-    var valDefExtractor = new ParentValDefExtractor(targetSymbol)
-
-    valDefExtractor.traverse(c.enclosingUnit.body)
-
-    //If we did not find ourselfs, this macro is broken. Yay.
-    if(!valDefExtractor.found) {
-      c.warning(c.enclosingPosition, "Macro Bug: Did not find closed function"
-                + " in enclosing tree. Symbol was: "
-                + targetSymbol)
-
-    }
-
-    //New return all Idents from our function which are also defined as
-    //Vals in the outer scope. This is necassary to filter out methods,
-    //which can be referenced via Ident, too.
-    distincFreeTerms.filter(x => {
-        !valDefExtractor.defs.find(y => (y._1 == x._2)).isEmpty
-    })
+    distinctFreeTerms
   }
 }
